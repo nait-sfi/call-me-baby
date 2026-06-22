@@ -1,32 +1,61 @@
-# from llm_sdk import Small_LLM_Model
-import argparse
-import json
-from src.schema import FunctionDef
+# import argparse
+# import json
+# from src.schema import FunctionDef
+# from src.decoder import mask_logits
+from llm_sdk import Small_LLM_Model
+import numpy as np
 
 
-def main() -> None:
-    arg_parser = argparse.ArgumentParser(description="call me baby")
-    arg_parser.add_argument("--functions_definition", required=True)
-    arg_parser.add_argument(
-        "--input",
-        default="data/input/function_calling_tests.json"
-        )
-    arg_parser.add_argument(
-        "--output",
-        default="data/output/function_calls.json"
-        )
+def main():
+    model = Small_LLM_Model()
+    input_ids = model.encode("The capital of France is").tolist()[0]
+    london_id = model.encode(" London").tolist()[0][0]
+    berlin_id = model.encode(" Berlin").tolist()[0][0]
+    allowed_ids = [london_id, berlin_id]
 
-    args = arg_parser.parse_args()
-    fn_df_file = args.functions_definition
+    for _ in range(5):
+        logits = model.get_logits_from_input_ids(input_ids)
+        inf_arr = np.full(len(logits), -np.inf)
+        np_arr_logits = np.array(logits)
+        inf_arr[allowed_ids] = np_arr_logits[allowed_ids]
+        win = inf_arr.argmax()
+        input_ids.append(win)
+    print("The result is : ", model.decode(input_ids))
 
-    with open(fn_df_file, "r") as file:
-        raw_data = json.load(file)
-        print(raw_data)
-        validated_functions = []
-        validated_functions = [FunctionDef.model_validate(item)
-                               for item in raw_data
-                               ]
-        print(validated_functions)
+# def main() -> None:
+#     # Fake AI outputting 5 scores (for tokens 0, 1, 2, 3, 4)
+#     fake_logits = [0.5, 2.1, -1.0, 5.5, 0.0]
+
+#     # We ONLY want to allow token ID 1 and 3.
+#     allowed = [1, 3]
+
+#     # Run your function!
+#     masked = mask_logits(fake_logits, allowed, 5)
+#     print("Masked Logits:", masked)
+#     return
+#     arg_parser = argparse.ArgumentParser(description="call me baby")
+#     arg_parser.add_argument("--functions_definition", required=True)
+#     arg_parser.add_argument(
+#         "--input",
+#         default="data/input/function_calling_tests.json"
+#         )
+#     arg_parser.add_argument(
+#         "--output",
+#         default="data/output/function_calls.json"
+#         )
+
+#     args = arg_parser.parse_args()
+#     fn_df_file = args.functions_definition
+
+#     with open(fn_df_file, "r") as file:
+#         raw_data = json.load(file)
+#         print(raw_data)
+#         validated_functions = []
+#         validated_functions = [FunctionDef.model_validate(item)
+#                                for item in raw_data
+#                                ]
+#         print(validated_functions)
+
 
 
 if __name__ == "__main__":

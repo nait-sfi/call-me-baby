@@ -1,3 +1,7 @@
+export UV_CACHE_DIR=/goinfre/nait-sfi/.uv_cache
+export HF_HOME=/goinfre/nait-sfi/.hf_cache
+export TMPDIR=/goinfre/nait-sfi/.tmp
+
 install:
 	uv sync
 
