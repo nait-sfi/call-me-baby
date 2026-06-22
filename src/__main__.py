@@ -7,20 +7,41 @@ import numpy as np
 
 
 def main():
+    prompt = "Question: What is the sum of 2 and 3?\nFunction name:"
     model = Small_LLM_Model()
-    input_ids = model.encode("The capital of France is").tolist()[0]
-    london_id = model.encode(" London").tolist()[0][0]
-    berlin_id = model.encode(" Berlin").tolist()[0][0]
-    allowed_ids = [london_id, berlin_id]
-
-    for _ in range(5):
+    for _ in range(2):
+        input_ids = model.encode(prompt).tolist()[0]
+        add_number_id = model.encode(" fn_add_numbers")
+        greeting_id = model.encode(" fn_greet")
+        allowed = np.array([add_number_id, greeting_id])
         logits = model.get_logits_from_input_ids(input_ids)
         inf_arr = np.full(len(logits), -np.inf)
-        np_arr_logits = np.array(logits)
-        inf_arr[allowed_ids] = np_arr_logits[allowed_ids]
+        np_logits = np.array(logits)
+
+        inf_arr[allowed] = np_logits[allowed]
+
         win = inf_arr.argmax()
         input_ids.append(win)
-    print("The result is : ", model.decode(input_ids))
+    print(model.decode(input_ids))
+
+
+
+
+# def main():
+#     model = Small_LLM_Model()
+#     input_ids = model.encode("The capital of France is").tolist()[0]
+#     london_id = model.encode(" London").tolist()[0][0]
+#     berlin_id = model.encode(" Berlin").tolist()[0][0]
+#     allowed_ids = [london_id, berlin_id]
+
+#     for _ in range(5):
+#         logits = model.get_logits_from_input_ids(input_ids)
+#         inf_arr = np.full(len(logits), -np.inf)
+#         np_arr_logits = np.array(logits)
+#         inf_arr[allowed_ids] = np_arr_logits[allowed_ids]
+#         win = inf_arr.argmax()
+#         input_ids.append(win)
+#     print("The result is : ", model.decode(input_ids))
 
 # def main() -> None:
 #     # Fake AI outputting 5 scores (for tokens 0, 1, 2, 3, 4)
