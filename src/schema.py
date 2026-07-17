@@ -16,10 +16,13 @@ class FunctionDef(BaseModel):
     description: str
     parameters: Dict[str, ParameterDetail]
     returns: FunctionReturn
-    
+
     def to_dict(self):
         return {
-            self.name: [(param, param_type["type"]) for param, param_type in self.parameters.items()]
+            self.name: [
+                (param, param_type["type"])
+                for param, param_type in self.parameters.items()
+            ]
         }
 
 

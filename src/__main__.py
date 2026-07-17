@@ -25,8 +25,6 @@
 #     print(model.decode(input_ids))
 
 
-
-
 # def main():
 #     model = Small_LLM_Model()
 #     input_ids = model.encode("The capital of France is").tolist()[0]
@@ -54,20 +52,6 @@
 #     masked = mask_logits(fake_logits, allowed, 5)
 #     print("Masked Logits:", masked)
 #     return
-#     arg_parser = argparse.ArgumentParser(description="call me baby")
-#     arg_parser.add_argument("--functions_definition", required=True)
-#     arg_parser.add_argument(
-#         "--input",
-#         default="data/input/function_calling_tests.json"
-#         )
-#     arg_parser.add_argument(
-#         "--output",
-#         default="data/output/function_calls.json"
-#         )
-
-#     args = arg_parser.parse_args()
-#     fn_df_file = args.functions_definition
-
 #     with open(fn_df_file, "r") as file:
 #         raw_data = json.load(file)
 #         print(raw_data)
@@ -78,10 +62,9 @@
 #         print(validated_functions)
 
 
-
 # if __name__ == "__main__":
 #     main()
-# import argparse
+import argparse
 import json
 # from src.schema import FunctionDef
 # from src.decoder import mask_logits
@@ -120,11 +103,11 @@ User:
 {user_prompt}
 
 JSON:
-"""
+""" # noqa
 
 
 def get_logits(logits, allowed_id):
-    logits_cpy = [-np.inf] * len(logits)
+    logits_cpy = [-np.inf] * 151643
     for i in allowed_id:
         logits_cpy[i] = logits[i]
     return logits_cpy
@@ -137,17 +120,46 @@ def constrained_function_name(functions, gen_ids, model):
     return {ids[nb_tk] for ids in fn_ids if gen_ids == ids[:nb_tk]}
 
 
-def constrained_decoding(logits: list[int], state: int, functions: list[dict], gen_ids: list[int], model):
+def constrained_decoding(
+    logits: list[int],
+    state: int,
+    functions: list[dict],
+    gen_ids: list[int],
+    model
+):
     if state == 1:
         allowed_ids = constrained_function_name(functions, gen_ids, model)
         return get_logits(logits, allowed_ids)
 
 
+def get_args():
+    arg_parser = argparse.ArgumentParser(description="call me baby")
+    arg_parser.add_argument("--functions_definition", required=True)
+    arg_parser.add_argument(
+        "--input",
+        default="data/input/function_calling_tests.json"
+        )
+    arg_parser.add_argument(
+        "--output",
+        default="data/output/function_calls.json"
+        )
+    args = arg_parser.parse_args()
+    fn_df = args.functions_definition
+    input = args.input
+    output = args.output
+
+    return fn_df, input, output
+
+
 def main():
-    with open("data/input/function_calling_tests.json") as f:
+
+    fn_df, input, ouput = get_args()
+
+    with open(input) as f:
         prompts = json.load(f)
         prompts = [Prompt.model_validate(prompt).prompt for prompt in prompts]
-    with open("data/input/functions_definition.json") as f:
+
+    with open(fn_df) as f:
         functions = json.load(f)
         [FunctionDef.model_validate(func) for func in functions]
     model = Small_LLM_Model()
@@ -170,9 +182,14 @@ def main():
         while 1:
             logits = model.get_logits_from_input_ids(ids)
             if state == 1:
-                logits = constrained_decoding(logits, state, functions, gen_ids, model)
-            if state == 2:
-                # constrained decoding of params 
+                logits = constrained_decoding(
+                        logits,
+                        state,
+                        functions,
+                        gen_ids, model
+                    )
+            # if state == 2:
+            # constrained decoding of params
             new_id = int(np.argmax(logits))
             new_token = model.decode(new_id)
             ids.append(new_id)
@@ -196,7 +213,6 @@ def main():
                 break
         print()
 
-
     # for _ in range(2):
     #     input_ids = model.encode(prompt).tolist()[0]
     #     add_number_id = model.encode(" fn_add_numbers")
@@ -211,8 +227,6 @@ def main():
     #     win = inf_arr.argmax()
     #     input_ids.append(win)
     # print(model.decode(input_ids))
-
-
 
 
 # def main():
@@ -242,20 +256,6 @@ def main():
 #     masked = mask_logits(fake_logits, allowed, 5)
 #     print("Masked Logits:", masked)
 #     return
-#     arg_parser = argparse.ArgumentParser(description="call me baby")
-#     arg_parser.add_argument("--functions_definition", required=True)
-#     arg_parser.add_argument(
-#         "--input",
-#         default="data/input/function_calling_tests.json"
-#         )
-#     arg_parser.add_argument(
-#         "--output",
-#         default="data/output/function_calls.json"
-#         )
-
-#     args = arg_parser.parse_args()
-#     fn_df_file = args.functions_definition
-
 #     with open(fn_df_file, "r") as file:
 #         raw_data = json.load(file)
 #         print(raw_data)
@@ -264,7 +264,6 @@ def main():
 #                                for item in raw_data
 #                                ]
 #         print(validated_functions)
-
 
 
 if __name__ == "__main__":
