@@ -39,9 +39,10 @@ JSON:
 
 
 def get_logits(logits, allowed_id):
-    logits_cpy = [-np.inf] * 151643
-    for i in allowed_id:
-        logits_cpy[i] = logits[i]
+    logits = np.asarray(logits)
+    logits_cpy = np.full(151643, -np.inf, dtype=np.float32)
+    idx = list(allowed_id)
+    logits_cpy[idx] = logits[idx]
     return logits_cpy
 
 
