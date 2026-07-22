@@ -15,6 +15,9 @@ Your job is to analyze the user's request and determine whether one of the avail
 Available functions:
 {functions}
 
+RULES
+    always if the parameter type is number caste it to float
+
 Example
 
 User:
@@ -26,7 +29,7 @@ Output:
   "name": "fn_add_numbers",
   "parameters": {{
     "a": 8.0,
-    "b": 9.0
+    "b": 9.0 
   }}
 }}
 
@@ -129,6 +132,7 @@ def main():
             ids.append(new_id)
             output += new_token
             print(new_token, end="", flush=True)
+            braket_track = 1
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
@@ -144,7 +148,11 @@ def main():
                 gen_ids.append(new_id)
                 fn_name += new_token
             if "}" in new_token:
-                break
+                braket_track -= 1
+                if braket_track == 0:
+                    break
+            elif "{" in new_token:
+                braket_track += 1
         print()
 
         try:
