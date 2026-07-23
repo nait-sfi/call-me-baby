@@ -6,39 +6,146 @@ from .schema import Prompt
 from .schema import FunctionDef
 
 
-def get_prompt(user_prompt: str, functions: list[dict]) -> str:
-    return f"""
-You are a function-calling assistant.
+def get_prompt(user_prompt: str, functions: list[dict], model) -> list[int]:
+    first = [
+        198,
+        2610,
+        525,
+        264,
+        729,
+        1786,
+        16740,
+        17847,
+        382,
+        7771,
+        2618,
+        374,
+        311,
+        23643,
+        279,
+        1196,
+        594,
+        1681,
+        323,
+        8253,
+        3425,
+        825,
+        315,
+        279,
+        2500,
+        5746,
+        1265,
+        387,
+        2598,
+        382,
+        16485,
+        5746,
+        510,
+    ]
+    second = [
+        198,
+        91916,
+        50,
+        198,
+        262,
+        2677,
+        421,
+        279,
+        5733,
+        943,
+        374,
+        1372,
+        68424,
+        432,
+        311,
+        2224,
+        271,
+        13314,
+        271,
+        1474,
+        510,
+        3838,
+        594,
+        279,
+        2629,
+        315,
+        220,
+        23,
+        323,
+        220,
+        24,
+        1939,
+        5097,
+        510,
+        515,
+        220,
+        330,
+        40581,
+        788,
+        330,
+        3838,
+        594,
+        279,
+        2629,
+        315,
+        220,
+        23,
+        323,
+        220,
+        24,
+        35718,
+        220,
+        330,
+        606,
+        788,
+        330,
+        8822,
+        2891,
+        32964,
+        756,
+        220,
+        330,
+        13786,
+        788,
+        341,
+        262,
+        330,
+        64,
+        788,
+        220,
+        23,
+        13,
+        15,
+        345,
+        262,
+        330,
+        65,
+        788,
+        220,
+        24,
+        13,
+        15,
+        198,
+        220,
+        456,
+        630,
+        7039,
+        1882,
+        279,
+        2701,
+        1681,
+        624,
+        1474,
+        510,
+    ]
+    end = [198, 5370, 510]
 
-Your job is to analyze the user's request and determine whether one of the available functions should be called.
+    func_ids = model.encode(f"{functions}").tolist()[0]
+    prompt_ids = model.encode(f"{user_prompt}").tolist()[0]
 
-Available functions:
-{functions}
+    result_ids = first + func_ids + second + prompt_ids + end
 
-RULES
-    always if the parameter type is number caste it to float
-
-Example
-
-User:
-What's the sum of 8 and 9?
-
-Output:
-{{
-  "prompt": "What's the sum of 8 and 9?",
-  "name": "fn_add_numbers",
-  "parameters": {{
-    "a": 8.0,
-    "b": 9.0 
-  }}
-}}
-
-Now process the following request.
-User:
-{user_prompt}
-
-JSON:
-""" # noqa
+    return result_ids
 
 
 def get_logits(logits, allowed_id):
@@ -90,14 +197,18 @@ def get_args():
 def main():
 
     fn_df, input, ouput = get_args()
+    try:
+        with open(input) as f:
+            prompts = json.load(f)
+            prompts = [Prompt.model_validate(prompt).prompt
+                       for prompt in prompts]
 
-    with open(input) as f:
-        prompts = json.load(f)
-        prompts = [Prompt.model_validate(prompt).prompt for prompt in prompts]
-
-    with open(fn_df) as f:
-        functions = json.load(f)
-        [FunctionDef.model_validate(func) for func in functions]
+        with open(fn_df) as f:
+            functions = json.load(f)
+            [FunctionDef.model_validate(func) for func in functions]
+    except Exception as e:
+        print(e)
+        return
 
     model = Small_LLM_Model()
     results = []
@@ -114,7 +225,7 @@ def main():
         print(p, end="", flush=True)
         output = p
         state = 1
-        ids = model.encode(get_prompt(prompt, functions)).tolist()[0]
+        ids = get_prompt(prompt, functions, model)
         ids += model.encode(p).tolist()[0]
         gen_ids = []
         fn_name = ""
