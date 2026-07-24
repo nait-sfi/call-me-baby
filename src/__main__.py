@@ -4,148 +4,35 @@ from llm_sdk import Small_LLM_Model
 import numpy as np
 from .schema import Prompt
 from .schema import FunctionDef
+import time
 
-
-def get_prompt(user_prompt: str, functions: list[dict], model) -> list[int]:
+def get_prompt_prefix(functions: list[dict], model) -> list[int]:
+    """Pre-compute the teaching prompt prefix (call this ONCE)"""
     first = [
-        198,
-        2610,
-        525,
-        264,
-        729,
-        1786,
-        16740,
-        17847,
-        382,
-        7771,
-        2618,
-        374,
-        311,
-        23643,
-        279,
-        1196,
-        594,
-        1681,
-        323,
-        8253,
-        3425,
-        825,
-        315,
-        279,
-        2500,
-        5746,
-        1265,
-        387,
-        2598,
-        382,
-        16485,
-        5746,
-        510,
+        198, 2610, 525, 264, 729, 1786, 16740, 17847, 382, 7771, 2618, 374,
+        311, 23643, 279, 1196, 594, 1681, 323, 8253, 3425, 825, 315, 279,
+        2500, 5746, 1265, 387, 2598, 382, 16485, 5746, 510,
     ]
     second = [
-        198,
-        91916,
-        50,
-        198,
-        262,
-        2677,
-        421,
-        279,
-        5733,
-        943,
-        374,
-        1372,
-        68424,
-        432,
-        311,
-        2224,
-        271,
-        13314,
-        271,
-        1474,
-        510,
-        3838,
-        594,
-        279,
-        2629,
-        315,
-        220,
-        23,
-        323,
-        220,
-        24,
-        1939,
-        5097,
-        510,
-        515,
-        220,
-        330,
-        40581,
-        788,
-        330,
-        3838,
-        594,
-        279,
-        2629,
-        315,
-        220,
-        23,
-        323,
-        220,
-        24,
-        35718,
-        220,
-        330,
-        606,
-        788,
-        330,
-        8822,
-        2891,
-        32964,
-        756,
-        220,
-        330,
-        13786,
-        788,
-        341,
-        262,
-        330,
-        64,
-        788,
-        220,
-        23,
-        13,
-        15,
-        345,
-        262,
-        330,
-        65,
-        788,
-        220,
-        24,
-        13,
-        15,
-        198,
-        220,
-        456,
-        630,
-        7039,
-        1882,
-        279,
-        2701,
-        1681,
-        624,
-        1474,
-        510,
+        198, 91916, 50, 198, 262, 2677, 421, 279, 5733, 943, 374, 1372,
+        68424, 432, 311, 2224, 271, 13314, 271, 1474, 510, 3838, 594, 279,
+        2629, 315, 220, 23, 323, 220, 24, 1939, 5097, 510, 515, 220, 330,
+        40581, 788, 330, 3838, 594, 279, 2629, 315, 220, 23, 323, 220, 24,
+        35718, 220, 330, 606, 788, 330, 8822, 2891, 32964, 756, 220, 330,
+        13786, 788, 341, 262, 330, 64, 788, 220, 23, 13, 15, 345, 262, 330,
+        65, 788, 220, 24, 13, 15, 198, 220, 456, 630, 7039, 1882, 279, 2701,
+        1681, 624, 1474, 510,
     ]
-    end = [198, 5370, 510]
 
     func_ids = model.encode(f"{functions}").tolist()[0]
-    prompt_ids = model.encode(f"{user_prompt}").tolist()[0]
+    return first + func_ids + second
 
-    result_ids = first + func_ids + second + prompt_ids + end
 
-    return result_ids
+def build_full_prompt(prefix: list[int], user_prompt: str, model) -> list[int]:
+    """Build the complete prompt using the cached prefix"""
+    end = [198, 5370, 510]
+    prompt_ids = model.encode(user_prompt).tolist()[0]
+    return prefix + prompt_ids + end
 
 
 def get_logits(logits, allowed_id):
@@ -156,22 +43,23 @@ def get_logits(logits, allowed_id):
     return logits_cpy
 
 
-def constrained_function_name(functions, gen_ids, model):
+def constrained_function_name(function_name_paths, gen_ids):
     nb_tk = len(gen_ids)
-    fn_ids = [model.encode(func["name"] + '",').tolist()[0]
-              for func in functions]
-    return {ids[nb_tk] for ids in fn_ids if gen_ids == ids[:nb_tk]}
+    return {
+        ids[nb_tk]
+        for ids in function_name_paths.values()
+        if len(ids) > nb_tk and gen_ids == ids[:nb_tk]
+    }
 
 
 def constrained_decoding(
     logits: list[int],
     state: int,
-    functions: list[dict],
+    functions_name_paths: list[dict],
     gen_ids: list[int],
-    model
 ):
     if state == 1:
-        allowed_ids = constrained_function_name(functions, gen_ids, model)
+        allowed_ids = constrained_function_name(functions_name_paths, gen_ids)
         return get_logits(logits, allowed_ids)
 
 
@@ -195,7 +83,6 @@ def get_args():
 
 
 def main():
-
     fn_df, input, ouput = get_args()
     try:
         with open(input) as f:
@@ -207,11 +94,17 @@ def main():
             functions = json.load(f)
             [FunctionDef.model_validate(func) for func in functions]
     except Exception as e:
-        print(e)
+        print(f"Error loading input files: {e}")
         return
 
     model = Small_LLM_Model()
     results = []
+    function_name_paths = {
+        func["name"]: model.encode(func["name"] + '",').tolist()[0]
+        for func in functions
+    }
+
+    teaching_prefix = get_prompt_prefix(functions, model)
 
     for prompt in prompts:
         p = json.dumps({"prompt": prompt, "name": ""})[:-2]
@@ -225,25 +118,29 @@ def main():
         print(p, end="", flush=True)
         output = p
         state = 1
-        ids = get_prompt(prompt, functions, model)
+        ids = build_full_prompt(teaching_prefix, prompt, model)
         ids += model.encode(p).tolist()[0]
         gen_ids = []
         fn_name = ""
-        while 1:
+        braket_track = 1
+        token_count = 0
+        MAX_TOKENS = 300
+
+        while token_count < MAX_TOKENS:
+            token_count += 1
             logits = model.get_logits_from_input_ids(ids)
             if state == 1:
                 logits = constrained_decoding(
                         logits,
                         state,
-                        functions,
-                        gen_ids, model
+                        function_name_paths,
+                        gen_ids
                     )
             new_id = int(np.argmax(logits))
             new_token = model.decode(new_id)
             ids.append(new_id)
             output += new_token
             print(new_token, end="", flush=True)
-            braket_track = 1
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
@@ -268,6 +165,10 @@ def main():
 
         try:
             result_dict = json.loads(output)
+            if "parameters" in result_dict:
+                for param_name, param_value in result_dict["parameters"].items():
+                    if isinstance(param_value, str):
+                        result_dict["parameters"][param_name] = param_value.strip()
             results.append(result_dict)
         except json.JSONDecodeError as e:
             print(f"Warning: Failed to parse JSON. Error: {e}")
@@ -281,4 +182,8 @@ def main():
 
 
 if __name__ == "__main__":
+    start_time = time.perf_counter()
     main()
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
+    print(f"Code took {elapsed_time:.6f} seconds to finish.")
