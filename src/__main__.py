@@ -23,19 +23,135 @@ def get_prompt_prefix(
         list[int]: Prefix token IDs.
     """
     first = [
-        198, 2610, 525, 264, 729, 1786, 16740, 17847, 382, 7771, 2618, 374,
-        311, 23643, 279, 1196, 594, 1681, 323, 8253, 3425, 825, 315, 279,
-        2500, 5746, 1265, 387, 2598, 382, 16485, 5746, 510,
+        198,
+        2610,
+        525,
+        264,
+        729,
+        1786,
+        16740,
+        17847,
+        382,
+        7771,
+        2618,
+        374,
+        311,
+        23643,
+        279,
+        1196,
+        594,
+        1681,
+        323,
+        8253,
+        3425,
+        825,
+        315,
+        279,
+        2500,
+        5746,
+        1265,
+        387,
+        2598,
+        382,
+        16485,
+        5746,
+        510,
     ]
     second = [
-        198, 91916, 50, 198, 262, 2677, 421, 279, 5733, 943, 374, 1372,
-        68424, 432, 311, 2224, 271, 13314, 271, 1474, 510, 3838, 594, 279,
-        2629, 315, 220, 23, 323, 220, 24, 1939, 5097, 510, 515, 220, 330,
-        40581, 788, 330, 3838, 594, 279, 2629, 315, 220, 23, 323, 220, 24,
-        35718, 220, 330, 606, 788, 330, 8822, 2891, 32964, 756, 220, 330,
-        13786, 788, 341, 262, 330, 64, 788, 220, 23, 13, 15, 345, 262, 330,
-        65, 788, 220, 24, 13, 15, 198, 220, 456, 630, 7039, 1882, 279, 2701,
-        1681, 624, 1474, 510,
+        198,
+        91916,
+        50,
+        198,
+        262,
+        2677,
+        421,
+        279,
+        5733,
+        943,
+        374,
+        1372,
+        68424,
+        432,
+        311,
+        2224,
+        271,
+        13314,
+        271,
+        1474,
+        510,
+        3838,
+        594,
+        279,
+        2629,
+        315,
+        220,
+        23,
+        323,
+        220,
+        24,
+        1939,
+        5097,
+        510,
+        515,
+        220,
+        330,
+        40581,
+        788,
+        330,
+        3838,
+        594,
+        279,
+        2629,
+        315,
+        220,
+        23,
+        323,
+        220,
+        24,
+        35718,
+        220,
+        330,
+        606,
+        788,
+        330,
+        8822,
+        2891,
+        32964,
+        756,
+        220,
+        330,
+        13786,
+        788,
+        341,
+        262,
+        330,
+        64,
+        788,
+        220,
+        23,
+        13,
+        15,
+        345,
+        262,
+        330,
+        65,
+        788,
+        220,
+        24,
+        13,
+        15,
+        198,
+        220,
+        456,
+        630,
+        7039,
+        1882,
+        279,
+        2701,
+        1681,
+        624,
+        1474,
+        510,
     ]
 
     func_ids = cast(list[int], model.encode(f"{functions}").tolist()[0])
@@ -138,14 +254,8 @@ def get_args() -> tuple[str, str, str]:
     """
     arg_parser = argparse.ArgumentParser(description="call me baby")
     arg_parser.add_argument("--functions_definition", required=True)
-    arg_parser.add_argument(
-        "--input",
-        default="data/input/function_calling_tests.json"
-        )
-    arg_parser.add_argument(
-        "--output",
-        default="data/output/function_calls.json"
-        )
+    arg_parser.add_argument("--input", default="data/input/function_calling_tests.json")
+    arg_parser.add_argument("--output", default="data/output/function_calls.json")
     args = arg_parser.parse_args()
     fn_df = args.functions_definition
     input_path = args.input
@@ -159,8 +269,7 @@ def main() -> None:
     try:
         with open(input_path, encoding="utf-8") as file_obj:
             prompts = json.load(file_obj)
-            prompts = [Prompt.model_validate(prompt).prompt
-                       for prompt in prompts]
+            prompts = [Prompt.model_validate(prompt).prompt for prompt in prompts]
 
         with open(fn_df, encoding="utf-8") as file_obj:
             functions = json.load(file_obj)
@@ -171,8 +280,9 @@ def main() -> None:
 
     if not functions:
         print("Warning: No function definitions provided.")
-        results = [{"prompt": prompt, "name": "", "parameters": {}}
-                   for prompt in prompts]
+        results = [
+            {"prompt": prompt, "name": "", "parameters": {}} for prompt in prompts
+        ]
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
         print(f"\n Successfully wrote {len(results)} results to {output_path}")
@@ -188,8 +298,9 @@ def main() -> None:
 
     if not valid_functions:
         print("Warning: No valid function definitions with non-empty names.")
-        results = [{"prompt": prompt, "name": "", "parameters": {}}
-                   for prompt in prompts]
+        results = [
+            {"prompt": prompt, "name": "", "parameters": {}} for prompt in prompts
+        ]
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
         print(f"\n Successfully wrote {len(results)} results to {output_path}")
@@ -203,17 +314,18 @@ def main() -> None:
     }
 
     teaching_prefix = get_prompt_prefix(valid_functions, model)
+    function_parameters = {
+        function["name"]: [
+            (name, param_info.get("type", "string"))
+            for name, param_info in function["parameters"].items()
+            if name
+        ]
+        for function in valid_functions
+    }
 
     for prompt in prompts:
         p = json.dumps({"prompt": prompt, "name": ""})[:-2]
-        function_parameters = {
-            function["name"]: [
-                (name, param_info.get("type", "string"))
-                for name, param_info in function["parameters"].items()
-                if name
-            ]
-            for function in valid_functions
-        }
+
         print(p, end="", flush=True)
         output = p
         state = 1
@@ -242,18 +354,18 @@ def main() -> None:
             new_token = model.decode([new_id])
             ids.append(new_id)
             output += new_token
-            print(new_token, end="", flush=True)
+            print(new_token, end="")
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
                 function_param = function_parameters.get(fn_name, [])
                 if function_param:
-                    name, param_type = function_param.pop(0)
+                    name, param_type = function_param[0]
                     quote = '"' if param_type == "string" else ""
                     new_s = f' "parameters":{{"{name}":{quote}'
                 else:
                     new_s = ' "parameters":{}'
-                print(new_s, end="", flush=True)
+                print(new_s, end="")
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
             elif state == 1:
@@ -265,7 +377,7 @@ def main() -> None:
                     break
             elif "{" in new_token:
                 braket_track += 1
-        print()
+        print(flush=True)
 
         try:
             result_dict = json.loads(output)
