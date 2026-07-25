@@ -1,14 +1,16 @@
-from pydantic import BaseModel, model_validator, Field
-from typing import Dict, Optional, Any
+from pydantic import BaseModel, model_validator, Field, ConfigDict
+from typing import Dict, Optional, Any, Literal
 
 
 class FunctionReturn(BaseModel):
-    type: str
+    type: Literal['string', 'number', 'boolean', 'integer']
+    model_config = ConfigDict(extra='forbid')
 
 
 class ParameterDetail(BaseModel):
-    type: str
+    type: Literal['string', 'number', 'boolien', 'integer']
     value: Optional[Any] = None
+    model_config = ConfigDict(extra='forbid')
 
 
 class FunctionDef(BaseModel):
@@ -16,6 +18,7 @@ class FunctionDef(BaseModel):
     description: str
     parameters: Dict[str, ParameterDetail]
     returns: FunctionReturn
+    model_config = ConfigDict(extra='forbid')
 
     def to_dict(self):
         return {
@@ -28,6 +31,7 @@ class FunctionDef(BaseModel):
 
 class Prompt(BaseModel):
     prompt: str
+    model_config = ConfigDict(extra='forbid')
 
     @model_validator(mode="after")
     def parse_prompt(self):

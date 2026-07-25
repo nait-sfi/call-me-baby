@@ -1,13 +1,27 @@
 import argparse
 import json
-from llm_sdk import Small_LLM_Model
+from collections.abc import Iterable, Sequence
+from typing import Any, cast
 import numpy as np
+from numpy.typing import NDArray
 from .schema import Prompt
 from .schema import FunctionDef
-import time
+from llm_sdk import Small_LLM_Model
 
-def get_prompt_prefix(functions: list[dict], model) -> list[int]:
-    """Pre-compute the teaching prompt prefix (call this ONCE)"""
+
+def get_prompt_prefix(
+    functions: list[dict[str, Any]],
+    model: Small_LLM_Model,
+) -> list[int]:
+    """Pre-compute the teaching prompt prefix.
+
+    Args:
+        functions: Function definitions injected in the prompt template.
+        model: Model used to tokenize the prompt.
+
+    Returns:
+        list[int]: Prefix token IDs.
+    """
     first = [
         198, 2610, 525, 264, 729, 1786, 16740, 17847, 382, 7771, 2618, 374,
         311, 23643, 279, 1196, 594, 1681, 323, 8253, 3425, 825, 315, 279,
@@ -24,26 +38,63 @@ def get_prompt_prefix(functions: list[dict], model) -> list[int]:
         1681, 624, 1474, 510,
     ]
 
-    func_ids = model.encode(f"{functions}").tolist()[0]
+    func_ids = cast(list[int], model.encode(f"{functions}").tolist()[0])
     return first + func_ids + second
 
 
-def build_full_prompt(prefix: list[int], user_prompt: str, model) -> list[int]:
-    """Build the complete prompt using the cached prefix"""
+def build_full_prompt(
+    prefix: list[int],
+    user_prompt: str,
+    model: Small_LLM_Model,
+) -> list[int]:
+    """Build the complete prompt using the cached prefix.
+
+    Args:
+        prefix: Precomputed prompt prefix token IDs.
+        user_prompt: Current user prompt text.
+        model: Model used to tokenize prompt text.
+
+    Returns:
+        list[int]: Full prompt token IDs.
+    """
     end = [198, 5370, 510]
-    prompt_ids = model.encode(user_prompt).tolist()[0]
+    prompt_ids = cast(list[int], model.encode(user_prompt).tolist()[0])
     return prefix + prompt_ids + end
 
 
-def get_logits(logits, allowed_id):
-    logits = np.asarray(logits)
-    logits_cpy = np.full(151643, -np.inf, dtype=np.float32)
-    idx = list(allowed_id)
-    logits_cpy[idx] = logits[idx]
-    return logits_cpy
+def get_logits(
+    logits: Sequence[float] | NDArray[np.float32],
+    allowed_ids: Iterable[int],
+) -> NDArray[np.float32]:
+    """Mask logits so only allowed token IDs can be selected.
+
+    Args:
+        logits: Raw logits returned by the model.
+        allowed_ids: Token IDs that remain available for decoding.
+
+    Returns:
+        NDArray[np.float32]: Masked logits array.
+    """
+    logits_array = np.asarray(logits, dtype=np.float32)
+    logits_copy = np.full(151643, -np.inf, dtype=np.float32)
+    idx = list(allowed_ids)
+    logits_copy[idx] = logits_array[idx]
+    return logits_copy
 
 
-def constrained_function_name(function_name_paths, gen_ids):
+def constrained_function_name(
+    function_name_paths: dict[str, list[int]],
+    gen_ids: list[int],
+) -> set[int]:
+    """Return allowed next-token IDs for function-name decoding.
+
+    Args:
+        function_name_paths: Tokenized function names keyed by name.
+        gen_ids: Already generated function-name token IDs.
+
+    Returns:
+        set[int]: Candidate next token IDs.
+    """
     nb_tk = len(gen_ids)
     return {
         ids[nb_tk]
@@ -53,17 +104,38 @@ def constrained_function_name(function_name_paths, gen_ids):
 
 
 def constrained_decoding(
-    logits: list[int],
+    logits: Sequence[float] | NDArray[np.float32],
     state: int,
-    functions_name_paths: list[dict],
+    functions_name_paths: dict[str, list[int]],
     gen_ids: list[int],
-):
+) -> NDArray[np.float32] | None:
+    """Apply constrained decoding according to the generation state.
+
+    Args:
+        logits: Raw logits from the model.
+        state: Decoding state machine value.
+        functions_name_paths: Tokenized function names keyed by name.
+        gen_ids: Generated token IDs for the function name fragment.
+
+    Returns:
+        NDArray[np.float32] | None: Constrained logits for state 1, otherwise
+        None.
+    """
     if state == 1:
         allowed_ids = constrained_function_name(functions_name_paths, gen_ids)
+        if not allowed_ids:
+            return np.asarray(logits, dtype=np.float32)
         return get_logits(logits, allowed_ids)
+    return None
 
 
-def get_args():
+def get_args() -> tuple[str, str, str]:
+    """Parse command line arguments.
+
+    Returns:
+        tuple[str, str, str]: Function definitions path, prompts path, and
+        output path.
+    """
     arg_parser = argparse.ArgumentParser(description="call me baby")
     arg_parser.add_argument("--functions_definition", required=True)
     arg_parser.add_argument(
@@ -76,51 +148,78 @@ def get_args():
         )
     args = arg_parser.parse_args()
     fn_df = args.functions_definition
-    input = args.input
+    input_path = args.input
     output = args.output
 
-    return fn_df, input, output
+    return fn_df, input_path, output
 
 
-def main():
-    fn_df, input, ouput = get_args()
+def main() -> None:
+    fn_df, input_path, output_path = get_args()
     try:
-        with open(input) as f:
-            prompts = json.load(f)
+        with open(input_path, encoding="utf-8") as file_obj:
+            prompts = json.load(file_obj)
             prompts = [Prompt.model_validate(prompt).prompt
                        for prompt in prompts]
 
-        with open(fn_df) as f:
-            functions = json.load(f)
+        with open(fn_df, encoding="utf-8") as file_obj:
+            functions = json.load(file_obj)
             [FunctionDef.model_validate(func) for func in functions]
     except Exception as e:
         print(f"Error loading input files: {e}")
+        return
+
+    if not functions:
+        print("Warning: No function definitions provided.")
+        results = [{"prompt": prompt, "name": "", "parameters": {}}
+                   for prompt in prompts]
+        with open(output_path, "w", encoding="utf-8") as file_obj:
+            json.dump(results, file_obj, indent=2)
+        print(f"\n Successfully wrote {len(results)} results to {output_path}")
+        return
+
+    valid_functions = []
+    for function in functions:
+        function_name = function.get("name", "")
+        if not function_name:
+            print("Warning: Skipping function definition with empty name.")
+            continue
+        valid_functions.append(function)
+
+    if not valid_functions:
+        print("Warning: No valid function definitions with non-empty names.")
+        results = [{"prompt": prompt, "name": "", "parameters": {}}
+                   for prompt in prompts]
+        with open(output_path, "w", encoding="utf-8") as file_obj:
+            json.dump(results, file_obj, indent=2)
+        print(f"\n Successfully wrote {len(results)} results to {output_path}")
         return
 
     model = Small_LLM_Model()
     results = []
     function_name_paths = {
         func["name"]: model.encode(func["name"] + '",').tolist()[0]
-        for func in functions
+        for func in valid_functions
     }
 
-    teaching_prefix = get_prompt_prefix(functions, model)
+    teaching_prefix = get_prompt_prefix(valid_functions, model)
 
     for prompt in prompts:
         p = json.dumps({"prompt": prompt, "name": ""})[:-2]
         function_parameters = {
             function["name"]: [
-                (name, type["type"])
-                for name, type in function["parameters"].items()
+                (name, param_info.get("type", "string"))
+                for name, param_info in function["parameters"].items()
+                if name
             ]
-            for function in functions
+            for function in valid_functions
         }
         print(p, end="", flush=True)
         output = p
         state = 1
         ids = build_full_prompt(teaching_prefix, prompt, model)
         ids += model.encode(p).tolist()[0]
-        gen_ids = []
+        gen_ids: list[int] = []
         fn_name = ""
         braket_track = 1
         token_count = 0
@@ -129,26 +228,31 @@ def main():
         while token_count < MAX_TOKENS:
             token_count += 1
             logits = model.get_logits_from_input_ids(ids)
+            logits_for_sampling: Sequence[float] | NDArray[np.float32] = logits
             if state == 1:
-                logits = constrained_decoding(
-                        logits,
-                        state,
-                        function_name_paths,
-                        gen_ids
-                    )
-            new_id = int(np.argmax(logits))
-            new_token = model.decode(new_id)
+                constrained_logits = constrained_decoding(
+                    logits,
+                    state,
+                    function_name_paths,
+                    gen_ids,
+                )
+                if constrained_logits is not None:
+                    logits_for_sampling = constrained_logits
+            new_id = int(np.argmax(logits_for_sampling))
+            new_token = model.decode([new_id])
             ids.append(new_id)
             output += new_token
             print(new_token, end="", flush=True)
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
-                function_param = function_parameters[fn_name]
-                if function_parameters:
-                    name, type = function_param.pop(0)
-                quote = '"' if type == "string" else ""
-                new_s = f' "parameters":{{"{name}":{quote}'
+                function_param = function_parameters.get(fn_name, [])
+                if function_param:
+                    name, param_type = function_param.pop(0)
+                    quote = '"' if param_type == "string" else ""
+                    new_s = f' "parameters":{{"{name}":{quote}'
+                else:
+                    new_s = ' "parameters":{}'
                 print(new_s, end="", flush=True)
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
@@ -166,24 +270,27 @@ def main():
         try:
             result_dict = json.loads(output)
             if "parameters" in result_dict:
-                for param_name, param_value in result_dict["parameters"].items():
+                dict_res = result_dict["parameters"].items()
+                clean_parameters = {}
+                for param_name, param_value in dict_res:
+                    if not param_name:
+                        continue
                     if isinstance(param_value, str):
-                        result_dict["parameters"][param_name] = param_value.strip()
+                        clean_parameters[param_name] = param_value.strip()
+                    else:
+                        clean_parameters[param_name] = param_value
+                result_dict["parameters"] = clean_parameters
             results.append(result_dict)
         except json.JSONDecodeError as e:
             print(f"Warning: Failed to parse JSON. Error: {e}")
 
     try:
-        with open(ouput, "w") as f:
-            json.dump(results, f, indent=2)
-        print(f"\n Successfully wrote {len(results)} results to {ouput}")
+        with open(output_path, "w", encoding="utf-8") as file_obj:
+            json.dump(results, file_obj, indent=2)
+        print(f"\n Successfully wrote {len(results)} results to {output_path}")
     except Exception as e:
         print(f"\n Error writing to output file: {e}")
 
 
 if __name__ == "__main__":
-    start_time = time.perf_counter()
     main()
-    end_time = time.perf_counter()
-    elapsed_time = end_time - start_time
-    print(f"Code took {elapsed_time:.6f} seconds to finish.")

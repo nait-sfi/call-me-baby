@@ -1,0 +1,3 @@
+prevent empty parameter names
+handle empty function definitions
+handle empty parameter list (this crashes you bone head!!!!!~)
