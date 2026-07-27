@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 from .schema import Prompt
 from .schema import FunctionDef
 from llm_sdk import Small_LLM_Model
+import time
 
 
 def get_prompt_prefix(
@@ -256,16 +257,22 @@ def get_args() -> tuple[str, str, str]:
     arg_parser.add_argument("--functions_definition", required=True)
     arg_parser.add_argument("--input", default="data/input/function_calling_tests.json")
     arg_parser.add_argument("--output", default="data/output/function_calls.json")
+    arg_parser.add_argument(
+        "--visual",
+        action="store_true",
+        help="use this flag to activate the visualization of the generation process",
+    )
     args = arg_parser.parse_args()
     fn_df = args.functions_definition
     input_path = args.input
     output = args.output
+    vistual = args.visual
 
-    return fn_df, input_path, output
+    return fn_df, input_path, output, vistual
 
 
 def main() -> None:
-    fn_df, input_path, output_path = get_args()
+    fn_df, input_path, output_path, visual = get_args()
     try:
         with open(input_path, encoding="utf-8") as file_obj:
             prompts = json.load(file_obj)
@@ -323,10 +330,11 @@ def main() -> None:
         for function in valid_functions
     }
 
+    start_time = time.time()
     for prompt in prompts:
         p = json.dumps({"prompt": prompt, "name": ""})[:-2]
-
-        print(p, end="", flush=True)
+        if visual:
+            print(p, end="", flush=True)
         output = p
         state = 1
         ids = build_full_prompt(teaching_prefix, prompt, model)
@@ -354,7 +362,8 @@ def main() -> None:
             new_token = model.decode([new_id])
             ids.append(new_id)
             output += new_token
-            print(new_token, end="")
+            if visual:
+                print(new_token, end="")
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
@@ -365,7 +374,8 @@ def main() -> None:
                     new_s = f' "parameters":{{"{name}":{quote}'
                 else:
                     new_s = ' "parameters":{}'
-                print(new_s, end="")
+                if visual:
+                    print(new_s, end="")
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
             elif state == 1:
@@ -377,7 +387,8 @@ def main() -> None:
                     break
             elif "{" in new_token:
                 braket_track += 1
-        print(flush=True)
+        if visual:
+            print(flush=True)
 
         try:
             result_dict = json.loads(output)
@@ -396,6 +407,8 @@ def main() -> None:
         except json.JSONDecodeError as e:
             print(f"Warning: Failed to parse JSON. Error: {e}")
 
+    end_time = time.time()
+    print(f"the program took {end_time - start_time} seconds")
     try:
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
