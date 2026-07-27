@@ -193,7 +193,7 @@ def get_logits(
         NDArray[np.float32]: Masked logits array.
     """
     logits_array = np.asarray(logits, dtype=np.float32)
-    logits_copy = np.full(151643, -np.inf, dtype=np.float32)
+    logits_copy = np.full(logits_array.shape[0], -np.inf, dtype=np.float32)
     idx = list(allowed_ids)
     logits_copy[idx] = logits_array[idx]
     return logits_copy
@@ -273,7 +273,6 @@ def get_args() -> tuple[str, str, str]:
 
 def main() -> None:
     fn_df, input_path, output_path, visual = get_args()
-    print(f"visual {visual}")
     try:
         with open(input_path, encoding="utf-8") as file_obj:
             prompts = json.load(file_obj)
@@ -370,7 +369,7 @@ def main() -> None:
             ids.append(new_id)
             output += new_token
             if visual:
-                print(new_token, end="")
+                print(new_token, end="", flush=True)
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
@@ -382,7 +381,7 @@ def main() -> None:
                 else:
                     new_s = ' "parameters":{}'
                 if visual:
-                    print(new_s, end="")
+                    print(new_s, end="", flush=True)
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
             elif state == 1:
@@ -395,7 +394,7 @@ def main() -> None:
             elif "{" in new_token:
                 braket_track += 1
         if visual:
-            print(flush=True)
+            print()
 
         try:
             result_dict = json.loads(output)
@@ -413,9 +412,6 @@ def main() -> None:
             results.append(result_dict)
         except json.JSONDecodeError as e:
             print(f"Warning: Failed to parse JSON. Error: {e}")
-
-    end_time = time.time()
-    print(f"the program took {end_time - start_time}")
     try:
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
