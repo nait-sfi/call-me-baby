@@ -351,7 +351,7 @@ def main() -> None:
         while token_count < MAX_TOKENS:
             token_count += 1
             new_token_ids = ids[processed_len:]
-            logits = model.get_logits_from_input_ids(
+            logits, past_key_values = model.get_logits_from_input_ids(
                 ids, past_key_values, new_token_ids
             )
             processed_len = len(ids)
