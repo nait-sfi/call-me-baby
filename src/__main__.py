@@ -273,6 +273,7 @@ def get_args() -> tuple[str, str, str]:
 
 def main() -> None:
     fn_df, input_path, output_path, visual = get_args()
+    print(f"visual {visual}")
     try:
         with open(input_path, encoding="utf-8") as file_obj:
             prompts = json.load(file_obj)
@@ -344,10 +345,16 @@ def main() -> None:
         braket_track = 1
         token_count = 0
         MAX_TOKENS = 300
+        past_key_values = None
+        processed_len = 0
 
         while token_count < MAX_TOKENS:
             token_count += 1
-            logits = model.get_logits_from_input_ids(ids)
+            new_token_ids = ids[processed_len:]
+            logits = model.get_logits_from_input_ids(
+                ids, past_key_values, new_token_ids
+            )
+            processed_len = len(ids)
             logits_for_sampling: Sequence[float] | NDArray[np.float32] = logits
             if state == 1:
                 constrained_logits = constrained_decoding(
@@ -408,7 +415,7 @@ def main() -> None:
             print(f"Warning: Failed to parse JSON. Error: {e}")
 
     end_time = time.time()
-    print(f"the program took {end_time - start_time} seconds")
+    print(f"the program took {end_time - start_time}")
     try:
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
