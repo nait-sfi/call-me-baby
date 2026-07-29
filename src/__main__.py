@@ -7,7 +7,6 @@ from numpy.typing import NDArray
 from .schema import Prompt
 from .schema import FunctionDef
 from llm_sdk import Small_LLM_Model
-import time
 
 
 def get_prompt_prefix(
@@ -255,28 +254,30 @@ def get_args() -> tuple[str, str, str]:
     """
     arg_parser = argparse.ArgumentParser(description="call me baby")
     arg_parser.add_argument("--functions_definition", required=True)
-    arg_parser.add_argument("--input", default="data/input/function_calling_tests.json")
-    arg_parser.add_argument("--output", default="data/output/function_calls.json")
     arg_parser.add_argument(
-        "--visual",
-        action="store_true",
-        help="use this flag to activate the visualization of the generation process",
+        "--input",
+        default="data/input/function_calling_tests.json"
     )
+    arg_parser.add_argument(
+        "--output",
+        default="data/output/function_calls.json"
+    )
+
     args = arg_parser.parse_args()
     fn_df = args.functions_definition
     input_path = args.input
     output = args.output
-    vistual = args.visual
 
-    return fn_df, input_path, output, vistual
+    return fn_df, input_path, output
 
 
 def main() -> None:
-    fn_df, input_path, output_path, visual = get_args()
+    fn_df, input_path, output_path = get_args()
     try:
         with open(input_path, encoding="utf-8") as file_obj:
             prompts = json.load(file_obj)
-            prompts = [Prompt.model_validate(prompt).prompt for prompt in prompts]
+            prompts = [Prompt.model_validate(prompt).prompt
+                       for prompt in prompts]
 
         with open(fn_df, encoding="utf-8") as file_obj:
             functions = json.load(file_obj)
@@ -288,7 +289,8 @@ def main() -> None:
     if not functions:
         print("Warning: No function definitions provided.")
         results = [
-            {"prompt": prompt, "name": "", "parameters": {}} for prompt in prompts
+            {"prompt": prompt, "name": "", "parameters": {}}
+            for prompt in prompts
         ]
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
@@ -306,7 +308,8 @@ def main() -> None:
     if not valid_functions:
         print("Warning: No valid function definitions with non-empty names.")
         results = [
-            {"prompt": prompt, "name": "", "parameters": {}} for prompt in prompts
+            {"prompt": prompt, "name": "", "parameters": {}}
+            for prompt in prompts
         ]
         with open(output_path, "w", encoding="utf-8") as file_obj:
             json.dump(results, file_obj, indent=2)
@@ -330,11 +333,9 @@ def main() -> None:
         for function in valid_functions
     }
 
-    start_time = time.time()
     for prompt in prompts:
         p = json.dumps({"prompt": prompt, "name": ""})[:-2]
-        if visual:
-            print(p, end="", flush=True)
+        print(p, end="", flush=True)
         output = p
         state = 1
         ids = build_full_prompt(teaching_prefix, prompt, model)
@@ -368,8 +369,7 @@ def main() -> None:
             new_token = model.decode([new_id])
             ids.append(new_id)
             output += new_token
-            if visual:
-                print(new_token, end="", flush=True)
+            print(new_token, end="", flush=True)
             if new_token == '",' and state == 1:
                 state = 2
                 gen_ids = []
@@ -380,8 +380,7 @@ def main() -> None:
                     new_s = f' "parameters":{{"{name}":{quote}'
                 else:
                     new_s = ' "parameters":{}'
-                if visual:
-                    print(new_s, end="", flush=True)
+                print(new_s, end="", flush=True)
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
             elif state == 1:
@@ -393,8 +392,7 @@ def main() -> None:
                     break
             elif "{" in new_token:
                 braket_track += 1
-        if visual:
-            print()
+        print()
 
         try:
             result_dict = json.loads(output)
