@@ -23,7 +23,7 @@ class FunctionDef(BaseModel):
     def to_dict(self) -> Dict[str, list]:
         return {
             self.name: [
-                (param, param_type["type"])
+                (param, param_type.type)
                 for param, param_type in self.parameters.items()
             ]
         }
