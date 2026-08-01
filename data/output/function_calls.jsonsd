@@ -1,5 +1,13 @@
 [
   {
+    "prompt": "What is the product of 3 and 5?",
+    "name": "fn_multiply_numbers",
+    "parameters": {
+      "a": 3.0,
+      "b": 5.0
+    }
+  },
+  {
     "prompt": "What is the product of 12 and 4?",
     "name": "fn_multiply_numbers",
     "parameters": {
@@ -50,7 +58,7 @@
     "prompt": "Read the file at /home/user/data.json with utf-8 encoding",
     "name": "fn_read_file",
     "parameters": {
-      "path": "/home/user/data.json",
+      "path": " /home/user/data.json",
       "encoding": "utf-8"
     }
   },
@@ -60,20 +68,6 @@
     "parameters": {
       "path": "C:\\Users\\john\\config.ini",
       "encoding": "latin-1"
-    }
-  },
-  {
-    "prompt": "Format template: Hello {user}'s profile!",
-    "name": "fn_format_template",
-    "parameters": {
-      "template": "Hello {user}'s profile!"
-    }
-  },
-  {
-    "prompt": "Format template: Say \"hello\" to {name}",
-    "name": "fn_format_template",
-    "parameters": {
-      "template": "Say \"hello\" to {name}"
     }
   }
 ]
