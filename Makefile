@@ -1,6 +1,5 @@
 install:
 	uv sync
-	source .venv/bin/activate
 
 run:
 	uv run python -m src \
@@ -23,5 +22,5 @@ clean:
 
 lint:
 	
-	flake8 .
-	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	uv run flake8 .
+	uv run mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
