@@ -1,9 +1,6 @@
-export UV_CACHE_DIR=/goinfre/nait-sfi/.uv_cache
-export HF_HOME=/goinfre/nait-sfi/.hf_cache
-export TMPDIR=/goinfre/nait-sfi/.tmp
-
 install:
 	uv sync
+	source .venv/bin/activate
 
 run:
 	uv run python -m src \
@@ -12,7 +9,12 @@ run:
 		--output data/output/function_calls.json
 
 debug:
-	uv run python -m pdb -m src
+	uv run python -m pdb -m src \
+		--functions_definition data/input/functions_definition.json \
+		--input data/input/function_calling_tests.json \
+		--output data/output/function_calls.json
+
+
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
@@ -21,9 +23,9 @@ clean:
 
 lint:
 	
-	flake8 --exclude=".venv ./llm_sdk/__init__.py" .
+	flake8 .
 	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
 
 lint-strict:
-	uv run flake8 .
-	uv run mypy . --strict
+	flake8 .
+	mypy . --strict
