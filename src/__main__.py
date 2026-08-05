@@ -253,7 +253,9 @@ def get_args() -> tuple[str, str, str]:
         output path.
     """
     arg_parser = argparse.ArgumentParser(description="call me baby")
-    arg_parser.add_argument("--functions_definition", required=True)
+    arg_parser.add_argument("--functions_definition",
+                            default="data/input/functions_definition.json",
+                            )
     arg_parser.add_argument(
         "--input",
         default="data/input/function_calling_tests.json"
@@ -331,6 +333,17 @@ def main() -> None:
             if name
         ]
         for function in valid_functions
+    }
+
+    digit_tokens = {model.encode(str(d)).tolist()[0][0] for d in range(10)}
+    minus_token = model.encode("-").tolist()[0][0]
+    dot_token = model.encode(".").tolist()[0][0]
+    comma_token = model.encode(",").tolist()[0][0]
+    close_brace_token = model.encode("}").tolist()[0][0]
+
+    bool_paths = {
+        "true": model.encode("true").tolist()[0],
+        "false": model.encode("false").tolist()[0],
     }
 
     for prompt in prompts:
