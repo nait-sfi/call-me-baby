@@ -8,10 +8,6 @@ from .schema import Prompt
 from .schema import FunctionDef
 from llm_sdk import Small_LLM_Model
 
-digit_tokens = set()
-minus_token = dot_token = \
-    close_brace_token = bool_paths = comma_token = []
-
 
 def get_prompt_prefix(
     functions: list[dict[str, Any]],
@@ -228,6 +224,12 @@ def constrained_decoding(
     state: int,
     functions_name_paths: dict[str, list[int]],
     gen_ids: list[int],
+    digit_tokens,
+    minus_token,
+    dot_token,
+    comma_token,
+    close_brace_token,
+    bool_paths
 ) -> NDArray[np.float32] | None:
     """Apply constrained decoding according to the generation state.
 
@@ -247,7 +249,15 @@ def constrained_decoding(
             return np.asarray(logits, dtype=np.float32)
         return get_logits(logits, allowed_ids)
     if state == 3:
-        allowed_ids = constrained_number_value(gen_ids)
+        allowed_ids = constrained_number_value(
+            gen_ids,
+            digit_tokens,
+            minus_token,
+            dot_token,
+            comma_token,
+            close_brace_token,
+            bool_paths
+        )
         return get_logits(logits, allowed_ids)
     if state == 5:
         allowed_ids = constrained_function_name(
@@ -288,13 +298,21 @@ def get_args() -> tuple[str, str, str]:
     return fn_df, input_path, output
 
 
-def constrained_number_value(gen_ids: list[int]) -> set[int]:
+def constrained_number_value(
+    gen_ids: list[int],
+    digit_tokens: set[int],
+    minus_token: int,
+    dot_token: int,
+    comma_token: int,
+    close_brace_token: int,
+    bool_paths
+) -> set[int]:
     allowed = set(digit_tokens)
     if not gen_ids:
-        allowed.add(minus_token)  # only allow "-" as the very first character
+        allowed.add(minus_token)
     if dot_token not in gen_ids:
-        allowed.add(dot_token)  # allow at most one "."
-    if gen_ids:  # only allow ending the value once something's been written
+        allowed.add(dot_token)
+    if gen_ids:
         allowed.add(comma_token)
         allowed.add(close_brace_token)
     return allowed
@@ -397,15 +415,22 @@ def main() -> None:
             )
             processed_len = len(ids)
             logits_for_sampling: Sequence[float] | NDArray[np.float32] = logits
-            if state == 1:
+            if state in (1, 3, 5):
                 constrained_logits = constrained_decoding(
                     logits,
                     state,
                     function_name_paths,
                     gen_ids,
+                    digit_tokens,
+                    minus_token,
+                    dot_token,
+                    comma_token,
+                    close_brace_token,
+                    bool_paths,
                 )
                 if constrained_logits is not None:
                     logits_for_sampling = constrained_logits
+
             new_id = int(np.argmax(logits_for_sampling))
             new_token = model.decode([new_id])
             ids.append(new_id)
