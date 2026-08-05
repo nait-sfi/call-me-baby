@@ -10,7 +10,7 @@ from llm_sdk import Small_LLM_Model
 
 digit_tokens = set()
 minus_token = dot_token = \
-    close_brace_token = bool_paths = comma_token = None
+    close_brace_token = bool_paths = comma_token = []
 
 
 def get_prompt_prefix(
@@ -249,6 +249,13 @@ def constrained_decoding(
     if state == 3:
         allowed_ids = constrained_number_value(gen_ids)
         return get_logits(logits, allowed_ids)
+    if state == 5:
+        allowed_ids = constrained_function_name(
+            bool_paths, gen_ids
+        )
+        if not allowed_ids:
+            return np.asarray(logits, dtype=np.float32)
+        return get_logits(logits, allowed_ids)
 
     return None
 
@@ -371,6 +378,7 @@ def main() -> None:
         print(p, end="", flush=True)
         output = p
         state = 1
+        param_index = 0
         ids = build_full_prompt(teaching_prefix, prompt, model)
         ids += model.encode(p).tolist()[0]
         gen_ids: list[int] = []
@@ -416,9 +424,25 @@ def main() -> None:
                 print(new_s, end="", flush=True)
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
-            elif state == 1:
-                gen_ids.append(new_id)
-                fn_name += new_token
+            elif state in (3, 5):
+                if new_token in (",", "}"):
+                    param_index += 1
+                    if param_index < len(function_param):
+                        next_name, next_type = function_param[param_index]
+                        quote = '"' if next_type == "string" else ""
+                        new_s = f' "{next_name}":{quote}'
+                        output += new_s
+                        ids.extend(model.encode(new_s).tolist()[0])
+                        gen_ids = []
+                        state = (
+                            3
+                            if next_type in ("number", "integer")
+                            else (5 if next_type == "boolean" else 2)
+                        )
+                    else:
+                        state = 2
+                else:
+                    gen_ids.append(new_id)
             if "}" in new_token:
                 braket_track -= 1
                 if braket_track == 0:
