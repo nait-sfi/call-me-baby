@@ -8,6 +8,10 @@ from .schema import Prompt
 from .schema import FunctionDef
 from llm_sdk import Small_LLM_Model
 
+digit_tokens = set()
+minus_token = dot_token = \
+    close_brace_token = bool_paths = comma_token = None
+
 
 def get_prompt_prefix(
     functions: list[dict[str, Any]],
@@ -242,6 +246,10 @@ def constrained_decoding(
         if not allowed_ids:
             return np.asarray(logits, dtype=np.float32)
         return get_logits(logits, allowed_ids)
+    if state == 3:
+        allowed_ids = constrained_number_value(gen_ids)
+        return get_logits(logits, allowed_ids)
+
     return None
 
 
@@ -271,6 +279,18 @@ def get_args() -> tuple[str, str, str]:
     output = args.output
 
     return fn_df, input_path, output
+
+
+def constrained_number_value(gen_ids: list[int]) -> set[int]:
+    allowed = set(digit_tokens)
+    if not gen_ids:
+        allowed.add(minus_token)  # only allow "-" as the very first character
+    if dot_token not in gen_ids:
+        allowed.add(dot_token)  # allow at most one "."
+    if gen_ids:  # only allow ending the value once something's been written
+        allowed.add(comma_token)
+        allowed.add(close_brace_token)
+    return allowed
 
 
 def main() -> None:
