@@ -61,6 +61,10 @@ def main() -> None:
     dot_token = model.encode(".").tolist()[0][0]
     comma_token = model.encode(",").tolist()[0][0]
     close_brace_token = model.encode("}").tolist()[0][0]
+    bool_paths = {
+        "true": model.encode("true").tolist()[0],
+        "false": model.encode("false").tolist()[0],
+    }
 
     for prompt in prompts:
         p = json.dumps({"prompt": prompt, "name": ""})[:-2]
@@ -88,7 +92,7 @@ def main() -> None:
             processed_len = len(ids)
             logits_for_sampling: Sequence[float] | NDArray[np.float32] = logits
 
-            if state in (1, 3):
+            if state in (1, 3, 5):
                 constrained_logits = constrained_decoding(
                     logits,
                     state,
@@ -99,6 +103,7 @@ def main() -> None:
                     dot_token,
                     comma_token,
                     close_brace_token,
+                    bool_paths,
                 )
                 if constrained_logits is not None:
                     logits_for_sampling = constrained_logits
@@ -116,7 +121,11 @@ def main() -> None:
                     name, param_type = function_param[0]
                     quote = '"' if param_type == "string" else ""
                     new_s = f' "parameters":{{"{name}":{quote}'
-                    state = 3 if param_type == "number" else 2
+                    state = (
+                        3
+                        if param_type in ("number", "integer")
+                        else (5 if param_type == "boolean" else 2)
+                    )
                 else:
                     new_s = ' "parameters":{}'
                     state = 2
@@ -129,7 +138,7 @@ def main() -> None:
                 gen_ids.append(new_id)
                 fn_name += new_token
 
-            elif state == 3:
+            elif state in (3, 5):
                 if "," in new_token or "}" in new_token:
                     param_index += 1
                     if param_index < len(function_param):
@@ -141,7 +150,11 @@ def main() -> None:
                         ids.extend(model.encode(new_s).tolist()[0])
                         braket_track += new_s.count("{") - new_s.count("}")
                         gen_ids = []
-                        state = 3 if next_type == "number" else 2
+                        state = (
+                            3
+                            if next_type in ("number", "integer")
+                            else (5 if next_type == "boolean" else 2)
+                        )
                     else:
                         state = 2
                 else:

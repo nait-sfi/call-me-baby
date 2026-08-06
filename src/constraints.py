@@ -60,6 +60,7 @@ def constrained_decoding(
     dot_token: int,
     comma_token: int,
     close_brace_token: int,
+    bool_paths: dict[str, list[int]],
 ) -> NDArray[np.float32] | None:
     """Apply constrained decoding according to the generation state."""
     if state == 1:
@@ -73,6 +74,12 @@ def constrained_decoding(
             gen_ids, digit_tokens, minus_token, dot_token,
             comma_token, close_brace_token,
         )
+        return get_logits(logits, allowed_ids)
+
+    if state == 5:
+        allowed_ids = constrained_function_name(bool_paths, gen_ids)
+        if not allowed_ids:
+            return np.asarray(logits, dtype=np.float32)
         return get_logits(logits, allowed_ids)
 
     return None
