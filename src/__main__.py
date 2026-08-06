@@ -477,12 +477,9 @@ def main() -> None:
                         state = 2
                 else:
                     gen_ids.append(new_id)
-            if "}" in new_token:
-                braket_track -= 1
-                if braket_track == 0:
-                    break
-            elif "{" in new_token:
-                braket_track += 1
+            braket_track += new_token.count("{") - new_token.count("}")
+            if braket_track == 0:
+                break
         print()
 
         try:
