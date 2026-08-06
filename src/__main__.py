@@ -441,7 +441,7 @@ def main() -> None:
                 gen_ids = []
                 function_param = function_parameters.get(fn_name, [])
                 if function_param:
-                    name, param_type = function_param.pop()
+                    name, param_type = function_param[0]
                     quote = '"' if param_type == "string" else ""
                     new_s = f' "parameters":{{"{name}":{quote}'
                     state = (
