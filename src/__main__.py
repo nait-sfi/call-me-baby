@@ -307,12 +307,13 @@ def constrained_number_value(
     close_brace_token: int,
     bool_paths
 ) -> set[int]:
+    has_digit = any(t in digit_tokens for t in gen_ids)
     allowed = set(digit_tokens)
     if not gen_ids:
         allowed.add(minus_token)
     if dot_token not in gen_ids:
         allowed.add(dot_token)
-    if gen_ids:
+    if has_digit:
         allowed.add(comma_token)
         allowed.add(close_brace_token)
     return allowed
@@ -437,18 +438,26 @@ def main() -> None:
             output += new_token
             print(new_token, end="", flush=True)
             if new_token == '",' and state == 1:
-                state = 2
                 gen_ids = []
                 function_param = function_parameters.get(fn_name, [])
                 if function_param:
-                    name, param_type = function_param[0]
+                    name, param_type = function_param.pop()
                     quote = '"' if param_type == "string" else ""
                     new_s = f' "parameters":{{"{name}":{quote}'
+                    state = (
+                        3
+                        if param_type in ("number", "integer")
+                        else (5 if param_type == "boolean" else 2)
+                    )
                 else:
                     new_s = ' "parameters":{}'
+                    state = 2
                 print(new_s, end="", flush=True)
                 output += new_s
                 ids.extend(model.encode(new_s).tolist()[0])
+            elif state == 1:
+                gen_ids.append(new_id)
+                fn_name += new_token
             elif state in (3, 5):
                 if new_token in (",", "}"):
                     param_index += 1
