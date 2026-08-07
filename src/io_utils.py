@@ -8,7 +8,9 @@ from .schema import FunctionDef, Prompt
 def get_args() -> tuple[str, str, str]:
     """Parse command line arguments."""
     arg_parser = argparse.ArgumentParser(description="call me baby")
-    arg_parser.add_argument("--functions_definition", required=True)
+    arg_parser.add_argument(
+        "--functions_definition", default="data/input/functions_definition.json"
+    )
     arg_parser.add_argument(
         "--input",
         default="data/input/function_calling_tests.json",
@@ -21,20 +23,26 @@ def get_args() -> tuple[str, str, str]:
     return args.functions_definition, args.input, args.output
 
 
+def prevent_duplicates(ordered_pairs):
+    d = {}
+    for key, value in ordered_pairs:
+        if key in d:
+            raise ValueError(f"Duplicate key found: {key}")
+        d[key] = value
+    return d
+
+
 def load_input_files(
     functions_definition_path: str,
     input_path: str,
 ) -> tuple[list[str], list[dict[str, Any]]]:
     """Load and validate prompts and function definitions."""
     with open(input_path, encoding="utf-8") as file_obj:
-        prompts_raw = json.load(file_obj)
-        prompts = [
-            Prompt.model_validate(prompt).prompt
-            for prompt in prompts_raw
-        ]
+        prompts_raw = json.load(file_obj, object_pairs_hook=prevent_duplicates)
+        prompts = [Prompt.model_validate(prompt).prompt for prompt in prompts_raw]
 
     with open(functions_definition_path, encoding="utf-8") as file_obj:
-        functions = json.load(file_obj)
+        functions = json.load(file_obj, object_pairs_hook=prevent_duplicates)
         [FunctionDef.model_validate(func) for func in functions]
 
     return prompts, functions
@@ -56,10 +64,7 @@ def filter_valid_functions(
 
 def build_empty_results(prompts: list[str]) -> list[dict[str, Any]]:
     """Build empty fallback results matching the prompt count."""
-    return [
-        {"prompt": prompt, "name": "", "parameters": {}}
-        for prompt in prompts
-    ]
+    return [{"prompt": prompt, "name": "", "parameters": {}} for prompt in prompts]
 
 
 def write_results(output_path: str, results: list[dict[str, Any]]) -> None:
