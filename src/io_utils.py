@@ -55,9 +55,8 @@ def load_input_files(
     """
     with open(input_path, encoding="utf-8") as file_obj:
         prompts_raw = json.load(file_obj, object_pairs_hook=prevent_duplicates)
-        prompts = [
-            Prompt.model_validate(prompt).prompt for prompt in prompts_raw
-        ]
+        prompts = [Prompt.model_validate(prompt).prompt
+                   for prompt in prompts_raw]
 
     with open(functions_definition_path, encoding="utf-8") as file_obj:
         functions = json.load(file_obj, object_pairs_hook=prevent_duplicates)
@@ -96,10 +95,8 @@ def build_empty_results(prompts: list[str]) -> list[dict[str, Any]]:
     Returns:
         Fallback results.
     """
-    return [
-        {"prompt": prompt, "name": "", "parameters": {}}
-        for prompt in prompts
-    ]
+    return [{"prompt": prompt, "name": "", "parameters": {}}
+            for prompt in prompts]
 
 
 def write_results(output_path: str, results: list[dict[str, Any]]) -> None:
