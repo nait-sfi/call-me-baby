@@ -6,10 +6,15 @@ from .schema import FunctionDef, Prompt
 
 
 def get_args() -> tuple[str, str, str]:
-    """Parse command line arguments."""
+    """Parse command line arguments.
+
+    Returns:
+        The function-definition, input, and output paths.
+    """
     arg_parser = argparse.ArgumentParser(description="call me baby")
     arg_parser.add_argument(
-        "--functions_definition", default="data/input/functions_definition.json"
+        "--functions_definition",
+        default="data/input/functions_definition.json",
     )
     arg_parser.add_argument(
         "--input",
@@ -23,8 +28,11 @@ def get_args() -> tuple[str, str, str]:
     return args.functions_definition, args.input, args.output
 
 
-def prevent_duplicates(ordered_pairs):
-    d = {}
+def prevent_duplicates(
+    ordered_pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    """Reject duplicate keys while loading JSON objects."""
+    d: dict[str, Any] = {}
     for key, value in ordered_pairs:
         if key in d:
             raise ValueError(f"Duplicate key found: {key}")
@@ -36,10 +44,20 @@ def load_input_files(
     functions_definition_path: str,
     input_path: str,
 ) -> tuple[list[str], list[dict[str, Any]]]:
-    """Load and validate prompts and function definitions."""
+    """Load and validate prompts and function definitions.
+
+    Args:
+        functions_definition_path: Path to the function definition JSON file.
+        input_path: Path to the prompt input JSON file.
+
+    Returns:
+        Prompts and raw functions.
+    """
     with open(input_path, encoding="utf-8") as file_obj:
         prompts_raw = json.load(file_obj, object_pairs_hook=prevent_duplicates)
-        prompts = [Prompt.model_validate(prompt).prompt for prompt in prompts_raw]
+        prompts = [
+            Prompt.model_validate(prompt).prompt for prompt in prompts_raw
+        ]
 
     with open(functions_definition_path, encoding="utf-8") as file_obj:
         functions = json.load(file_obj, object_pairs_hook=prevent_duplicates)
@@ -51,7 +69,14 @@ def load_input_files(
 def filter_valid_functions(
     functions: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Keep only functions with a non-empty name."""
+    """Keep only functions with a non-empty name.
+
+    Args:
+        functions: Raw function definitions.
+
+    Returns:
+        Valid functions.
+    """
     valid_functions = []
     for function in functions:
         function_name = function.get("name", "")
@@ -63,11 +88,26 @@ def filter_valid_functions(
 
 
 def build_empty_results(prompts: list[str]) -> list[dict[str, Any]]:
-    """Build empty fallback results matching the prompt count."""
-    return [{"prompt": prompt, "name": "", "parameters": {}} for prompt in prompts]
+    """Build empty fallback results matching the prompt count.
+
+    Args:
+        prompts: The prompts to mirror in the fallback output.
+
+    Returns:
+        Fallback results.
+    """
+    return [
+        {"prompt": prompt, "name": "", "parameters": {}}
+        for prompt in prompts
+    ]
 
 
 def write_results(output_path: str, results: list[dict[str, Any]]) -> None:
-    """Persist output results to disk."""
+    """Persist output results to disk.
+
+    Args:
+        output_path: Destination JSON file path.
+        results: Results to serialize.
+    """
     with open(output_path, "w", encoding="utf-8") as file_obj:
         json.dump(results, file_obj, indent=2)

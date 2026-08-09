@@ -18,6 +18,15 @@ members = [
     "llm_sdk",
 ]
 
+[tool.mypy]
+exclude = [
+	"^llm_sdk/"
+]
+
+[[tool.mypy.overrides]]
+module = "llm_sdk.*"
+ignore_errors = true
+
 [dependency-groups]
 dev = [
     "flake8>=7.3.0",
