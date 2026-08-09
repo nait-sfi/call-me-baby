@@ -47,7 +47,7 @@ make lint
 ```
 
 ## Algorithm explanation (constrained decoding)
-The constrained decoding is implemented in `src/__main__.py` around a state-driven loop:
+The constrained decoding is implemented in `src/generation.py` around a state-driven loop:
 1. **Pre-tokenize allowed function names**: each function name is encoded as tokens (`function_name_paths`).
 2. **Track generated function-name prefix**: while in state `1`, generated IDs are stored in `gen_ids`.
 3. **Compute legal next-token set**: `constrained_function_name()` keeps only token IDs that continue at least one valid function-name path matching `gen_ids`.
@@ -62,6 +62,7 @@ This creates a deterministic constrained step for function-name decoding while l
 - **Prefix-path constraint over regex/string filtering**: operates directly in token space, which matches model logits and avoids post-hoc string correction.
 - **Prompt-prefix caching**: `get_prompt_prefix()` precomputes static prompt parts once per run to reduce repeated work.
 - **Strict schema validation**: input prompts and function definitions are validated with Pydantic models (`src/schema.py`) before generation.
+- **Separation of concerns**: CLI wiring lives in `src/__main__.py`, while decoding helpers live in `src/generation.py`.
 - **Graceful fallback paths**: empty/invalid function sets are handled explicitly and still produce structured output.
 
 ## Performance analysis
