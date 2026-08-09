@@ -11,7 +11,11 @@ from .generation import generate_result_for_prompt, prepare_model_metadata
 
 
 def main() -> None:
-    """Run the function-calling generation pipeline."""
+    """Run the function-calling generation pipeline.
+
+    Returns:
+        None: This function does not return a value.
+    """
     fn_df, input_path, output_path = get_args()
     try:
         prompts, functions = load_input_files(fn_df, input_path)

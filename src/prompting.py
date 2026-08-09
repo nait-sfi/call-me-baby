@@ -10,11 +10,13 @@ def get_prompt_prefix(
     """Pre-compute the teaching prompt prefix.
 
     Args:
-        functions: Function definitions used to seed the prompt.
-        model: Tokenizer/model used to encode the prompt text.
+        functions (list[dict[str, Any]]): Function definitions used to seed
+            the prompt.
+        model (Small_LLM_Model): Tokenizer/model used to encode prompt text.
 
     Returns:
-        The token IDs for the static teaching prefix and encoded functions.
+        list[int]: Token IDs for the static teaching prefix and encoded
+        functions.
     """
     first = [
         198,
@@ -159,12 +161,12 @@ def build_full_prompt(
     """Build the complete prompt using the cached prefix.
 
     Args:
-        prefix: Precomputed static prefix token IDs.
-        user_prompt: The user prompt to append.
-        model: Tokenizer/model used to encode the prompt text.
+        prefix (list[int]): Precomputed static prefix token IDs.
+        user_prompt (str): User prompt to append.
+        model (Small_LLM_Model): Tokenizer/model used to encode prompt text.
 
     Returns:
-        The full prompt as token IDs.
+        list[int]: Full prompt as token IDs.
     """
     end = [198, 5370, 510]
     prompt_ids = cast(list[int], model.encode(user_prompt).tolist()[0])

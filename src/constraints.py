@@ -11,11 +11,14 @@ def get_logits(
     """Mask logits so only allowed token IDs can be selected.
 
     Args:
-        logits: Model logits for the next token.
-        allowed_ids: Token IDs that are allowed to remain unmasked.
+        logits (Sequence[float] | NDArray[np.float32]): Model logits for the
+            next token.
+        allowed_ids (Iterable[int]): Token IDs that are allowed to remain
+            unmasked.
 
     Returns:
-        A copy of the logits where disallowed IDs are set to ``-inf``.
+        NDArray[np.float32]: Copy of logits where disallowed IDs are set to
+        ``-inf``.
     """
     logits_array = np.asarray(logits, dtype=np.float32)
     logits_copy = np.full(logits_array.shape[0], -np.inf, dtype=np.float32)
@@ -31,11 +34,12 @@ def constrained_function_name(
     """Return allowed next-token IDs for function-name decoding.
 
     Args:
-        function_name_paths: Tokenized function-name paths keyed by name.
-        gen_ids: Generated token IDs so far.
+        function_name_paths (dict[str, list[int]]): Tokenized function-name
+            paths keyed by name.
+        gen_ids (list[int]): Generated token IDs so far.
 
     Returns:
-        The set of valid next token IDs.
+        set[int]: Valid next token IDs.
     """
     nb_tk = len(gen_ids)
     return {
@@ -56,15 +60,15 @@ def constrained_number_value(
     """Return allowed next-token IDs while writing a numeric value.
 
     Args:
-        gen_ids: Generated token IDs so far.
-        digit_tokens: Token IDs representing decimal digits.
-        minus_token: Token ID for the minus sign.
-        dot_token: Token ID for the decimal point.
-        comma_token: Token ID for the comma separator.
-        close_brace_token: Token ID for the closing brace.
+        gen_ids (list[int]): Generated token IDs so far.
+        digit_tokens (set[int]): Token IDs representing decimal digits.
+        minus_token (int): Token ID for the minus sign.
+        dot_token (int): Token ID for the decimal point.
+        comma_token (int): Token ID for the comma separator.
+        close_brace_token (int): Token ID for the closing brace.
 
     Returns:
-        The set of valid next token IDs.
+        set[int]: Valid next token IDs.
     """
     has_digit = any(t in digit_tokens for t in gen_ids)
     allowed = set(digit_tokens)
@@ -93,19 +97,22 @@ def constrained_decoding(
     """Apply constrained decoding according to the generation state.
 
     Args:
-        logits: Model logits for the next token.
-        state: Current constrained-decoding state.
-        functions_name_paths: Tokenized function-name paths keyed by name.
-        gen_ids: Generated token IDs so far.
-        digit_tokens: Token IDs representing decimal digits.
-        minus_token: Token ID for the minus sign.
-        dot_token: Token ID for the decimal point.
-        comma_token: Token ID for the comma separator.
-        close_brace_token: Token ID for the closing brace.
-        bool_paths: Tokenized boolean literal paths.
+        logits (Sequence[float] | NDArray[np.float32]): Model logits for the
+            next token.
+        state (int): Current constrained-decoding state.
+        functions_name_paths (dict[str, list[int]]): Tokenized function-name
+            paths keyed by name.
+        gen_ids (list[int]): Generated token IDs so far.
+        digit_tokens (set[int]): Token IDs representing decimal digits.
+        minus_token (int): Token ID for the minus sign.
+        dot_token (int): Token ID for the decimal point.
+        comma_token (int): Token ID for the comma separator.
+        close_brace_token (int): Token ID for the closing brace.
+        bool_paths (dict[str, list[int]]): Tokenized boolean literal paths.
 
     Returns:
-        Masked logits when the state is constrained, otherwise ``None``.
+        NDArray[np.float32] | None: Masked logits when the state is
+        constrained, otherwise ``None``.
     """
     if state == 1:
         allowed_ids = constrained_function_name(functions_name_paths, gen_ids)

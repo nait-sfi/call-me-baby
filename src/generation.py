@@ -1,10 +1,12 @@
 """Generation helpers for constrained function calling."""
 
 import json
+from functools import lru_cache
 from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
+from tokenizers import Tokenizer
 
 from llm_sdk import Small_LLM_Model
 
@@ -13,7 +15,21 @@ from .prompting import build_full_prompt, get_prompt_prefix
 
 
 class GenerationMetadata(TypedDict):
-    """Cached values used by the generation loop."""
+    """Cached values used by the generation loop.
+
+    Attributes:
+        function_name_paths (dict[str, list[int]]): Tokenized function-name
+            paths keyed by function name.
+        teaching_prefix (list[int]): Tokenized reusable prompt prefix.
+        function_parameters (dict[str, list[tuple[str, str]]]): Function
+            parameter metadata keyed by function name.
+        digit_tokens (set[int]): Token IDs for decimal digits.
+        minus_token (int): Token ID for ``-``.
+        dot_token (int): Token ID for ``.``.
+        comma_token (int): Token ID for ``,``
+        close_brace_token (int): Token ID for ``}``.
+        bool_paths (dict[str, list[int]]): Tokenized paths for boolean values.
+    """
 
     function_name_paths: dict[str, list[int]]
     teaching_prefix: list[int]
@@ -26,6 +42,34 @@ class GenerationMetadata(TypedDict):
     bool_paths: dict[str, list[int]]
 
 
+def decode_token(model: Small_LLM_Model, token_id: int) -> str:
+    """Decode a single token id using tokenizer files exposed by llm_sdk.
+
+    Args:
+        model (Small_LLM_Model): Model used to locate tokenizer assets.
+        token_id (int): Token ID to decode.
+
+    Returns:
+        str: Decoded token text.
+    """
+    tokenizer_path = model.get_path_to_tokenizer_file()
+    tokenizer = _load_tokenizer(tokenizer_path)
+    return tokenizer.decode([token_id], skip_special_tokens=True)
+
+
+@lru_cache(maxsize=8)
+def _load_tokenizer(tokenizer_path: str) -> Tokenizer:
+    """Load and cache a tokenizer by file path.
+
+    Args:
+        tokenizer_path (str): Path to tokenizer JSON file.
+
+    Returns:
+        Tokenizer: Loaded tokenizer instance.
+    """
+    return Tokenizer.from_file(tokenizer_path)
+
+
 def prepare_model_metadata(
     model: Small_LLM_Model,
     valid_functions: list[dict[str, Any]],
@@ -34,11 +78,13 @@ def prepare_model_metadata(
     decoding.
 
     Args:
-        model: Tokenizer/model used for encoding and decoding.
-        valid_functions: Validated function definitions.
+        model (Small_LLM_Model): Tokenizer/model used for encoding and
+            decoding.
+        valid_functions (list[dict[str, Any]]): Validated function
+            definitions.
 
     Returns:
-        Cached metadata used by the generation loop.
+        GenerationMetadata: Cached metadata used by the generation loop.
     """
     function_name_paths: dict[str, list[int]] = {
         func["name"]: model.encode(func["name"] + '",').tolist()[0]
@@ -81,11 +127,12 @@ def _postprocess_result(output: str, prompt: str) -> dict[str, Any]:
     """Parse and clean parameters from generated JSON output.
 
     Args:
-        output: Generated JSON string.
-        prompt: Prompt associated with the output.
+        output (str): Generated JSON string.
+        prompt (str): Prompt associated with the output.
 
     Returns:
-        A parsed result dictionary, or a fallback result on JSON errors.
+        dict[str, Any]: Parsed result dictionary, or fallback result on JSON
+        errors.
     """
     try:
         result_dict: dict[str, Any] = json.loads(output)
@@ -115,13 +162,13 @@ def generate_result_for_prompt(
     """Generate a single result dict for a prompt.
 
     Args:
-        prompt: Prompt to decode.
-        model: Tokenizer/model used for generation.
-        metadata: Precomputed decoding metadata.
-        max_tokens: Maximum number of generated tokens.
+        prompt (str): Prompt to decode.
+        model (Small_LLM_Model): Tokenizer/model used for generation.
+        metadata (GenerationMetadata): Precomputed decoding metadata.
+        max_tokens (int): Maximum number of generated tokens.
 
     Returns:
-        The parsed result dictionary for the prompt.
+        dict[str, Any]: Parsed result dictionary for the prompt.
     """
     function_name_paths = metadata["function_name_paths"]
     teaching_prefix = metadata["teaching_prefix"]
@@ -174,7 +221,7 @@ def generate_result_for_prompt(
                 logits_for_sampling = constrained_logits
 
         new_id = int(np.argmax(logits_for_sampling))
-        new_token = model.decode([new_id])
+        new_token = decode_token(model, new_id)
         ids.append(new_id)
         output += new_token
         print(new_token, end="", flush=True)

@@ -6,14 +6,25 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class FunctionReturn(BaseModel):
-    """Describe a function return type."""
+    """Describe a function return type.
+
+    Attributes:
+        type (Literal["string", "number", "boolean", "integer"]): Declared
+            return type.
+    """
 
     type: Literal["string", "number", "boolean", "integer"]
     model_config = ConfigDict(extra="forbid")
 
 
 class ParameterDetail(BaseModel):
-    """Describe a function parameter."""
+    """Describe a function parameter.
+
+    Attributes:
+        type (Literal["string", "number", "boolean", "integer"]): Declared
+            parameter type.
+        value (Any | None): Optional default/example parameter value.
+    """
 
     type: Literal["string", "number", "boolean", "integer"]
     value: Any | None = None
@@ -21,7 +32,14 @@ class ParameterDetail(BaseModel):
 
 
 class FunctionDef(BaseModel):
-    """Validate a function definition."""
+    """Validate a function definition.
+
+    Attributes:
+        name (str): Function name.
+        description (str): Human-readable function description.
+        parameters (dict[str, ParameterDetail]): Parameter definitions.
+        returns (FunctionReturn): Return value schema.
+    """
 
     name: str = Field(min_length=2)
     description: str
@@ -29,32 +47,24 @@ class FunctionDef(BaseModel):
     returns: FunctionReturn
     model_config = ConfigDict(extra="forbid")
 
-    def to_dict(self) -> dict[str, list[tuple[str, str]]]:
-        """Convert the function definition into tokenizable metadata."""
-        return {
-            self.name: [
-                (param, param_type.type)
-                for param, param_type in self.parameters.items()
-            ]
-        }
-
-    def get_parameter_types(self) -> list[tuple[str, str]]:
-        """Return the function parameters as name/type pairs."""
-        return [
-            (param, param_type.type)
-            for param, param_type in self.parameters.items()
-        ]
-
 
 class Prompt(BaseModel):
-    """Validate a single prompt."""
+    """Validate a single prompt.
+
+    Attributes:
+        prompt (str): User prompt text.
+    """
 
     prompt: str
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
     def parse_prompt(self) -> "Prompt":
-        """Reject empty prompts."""
+        """Reject empty prompts.
+
+        Returns:
+            Prompt: Validated prompt instance.
+        """
         if not self.prompt.strip():
             raise ValueError("Error: empty prompt")
         return self

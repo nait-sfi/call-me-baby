@@ -9,7 +9,7 @@ def get_args() -> tuple[str, str, str]:
     """Parse command line arguments.
 
     Returns:
-        The function-definition, input, and output paths.
+        tuple[str, str, str]: Function-definition, input, and output paths.
     """
     arg_parser = argparse.ArgumentParser(description="call me baby")
     arg_parser.add_argument(
@@ -31,7 +31,14 @@ def get_args() -> tuple[str, str, str]:
 def prevent_duplicates(
     ordered_pairs: list[tuple[str, Any]],
 ) -> dict[str, Any]:
-    """Reject duplicate keys while loading JSON objects."""
+    """Reject duplicate keys while loading JSON objects.
+
+    Args:
+        ordered_pairs (list[tuple[str, Any]]): Ordered JSON key/value pairs.
+
+    Returns:
+        dict[str, Any]: Dictionary with unique keys.
+    """
     d: dict[str, Any] = {}
     for key, value in ordered_pairs:
         if key in d:
@@ -47,11 +54,12 @@ def load_input_files(
     """Load and validate prompts and function definitions.
 
     Args:
-        functions_definition_path: Path to the function definition JSON file.
-        input_path: Path to the prompt input JSON file.
+        functions_definition_path (str): Path to function definition JSON file.
+        input_path (str): Path to prompt input JSON file.
 
     Returns:
-        Prompts and raw functions.
+        tuple[list[str], list[dict[str, Any]]]: Validated prompts and raw
+        functions.
     """
     with open(input_path, encoding="utf-8") as file_obj:
         prompts_raw = json.load(file_obj, object_pairs_hook=prevent_duplicates)
@@ -71,10 +79,10 @@ def filter_valid_functions(
     """Keep only functions with a non-empty name.
 
     Args:
-        functions: Raw function definitions.
+        functions (list[dict[str, Any]]): Raw function definitions.
 
     Returns:
-        Valid functions.
+        list[dict[str, Any]]: Functions with non-empty names.
     """
     valid_functions = []
     for function in functions:
@@ -90,10 +98,10 @@ def build_empty_results(prompts: list[str]) -> list[dict[str, Any]]:
     """Build empty fallback results matching the prompt count.
 
     Args:
-        prompts: The prompts to mirror in the fallback output.
+        prompts (list[str]): Prompts to mirror in the fallback output.
 
     Returns:
-        Fallback results.
+        list[dict[str, Any]]: Fallback results.
     """
     return [{"prompt": prompt, "name": "", "parameters": {}}
             for prompt in prompts]
@@ -103,8 +111,11 @@ def write_results(output_path: str, results: list[dict[str, Any]]) -> None:
     """Persist output results to disk.
 
     Args:
-        output_path: Destination JSON file path.
-        results: Results to serialize.
+        output_path (str): Destination JSON file path.
+        results (list[dict[str, Any]]): Results to serialize.
+
+    Returns:
+        None: This function does not return a value.
     """
     with open(output_path, "w", encoding="utf-8") as file_obj:
         json.dump(results, file_obj, indent=2)
